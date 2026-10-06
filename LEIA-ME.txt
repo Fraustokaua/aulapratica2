@@ -1,0 +1,145 @@
+TITAN CATCH - ADVERGAME
+Etapas de criação do projeto
+=====================================================================
+
+Arquivo principal: titan-catch.html (abrir direto no navegador)
+
+
+1. JOGO BASE
+---------------------------------------------------------------------
+O projeto partiu de um jogo simples em HTML, CSS e JavaScript.
+O jogador move uma coqueteleira (shaker) com as setas do teclado
+(esquerda e direita) para apanhar itens que caem do topo da tela.
+
+- Itens bons dão pontos (+10).
+- Itens ruins tiram pontos (-15).
+- A partida dura 30 segundos.
+- No final, a pontuação gera um cupom de desconto (advergame):
+    150 pontos ou mais -> TITAN10 (10% OFF)
+    300 pontos ou mais -> TITAN20 (20% OFF)
+
+
+2. SUBSTITUIÇÃO DAS FORMAS GEOMÉTRICAS POR SPRITES
+---------------------------------------------------------------------
+As formas coloridas (círculos verdes/vermelhos e o retângulo do shaker)
+foram trocadas por imagens (<img>). Os caminhos das imagens ficam no
+objeto SPRITES, dentro do JavaScript:
+
+    sprites/player.png     -> personagem
+    sprites/shoulder.png   -> peso de ombro (halter)
+    sprites/back.png       -> barra de costas
+    sprites/whey.png       -> pote de whey protein
+    sprites/junk.png       -> fast food
+
+Se um arquivo de imagem não existir, o jogo gera automaticamente um
+placeholder (um quadrado colorido com o nome do item). Assim o jogo
+funciona mesmo sem a arte final, e cada imagem pode ser trocada
+depois sem mexer na lógica.
+
+
+3. SISTEMA DE COMBO
+---------------------------------------------------------------------
+Foi criado um combo baseado em uma sequência de treino real:
+
+    2x peso de ombro + 1x barra de costas = PONTOS x2
+
+Regras:
+- Ao completar a sequência, os ganhos de pontos dobram por 8 segundos.
+- Completar o combo de novo durante o x2 reinicia o tempo.
+- Apanhar fast food zera o progresso da sequência.
+- O whey é neutro: dá pontos, mas não ajuda nem atrapalha o combo.
+- Apanhar um item fora de ordem zera o progresso (se for um peso de
+  ombro, ele conta como o primeiro passo de uma nova tentativa).
+- A penalidade do fast food (-15) nunca é dobrada.
+
+Feedback visual: quadradinhos de progresso no topo da tela, barra com
+o tempo restante do x2, moldura dourada durante o combo, textos
+flutuantes de pontos e contagem de combos no fim da partida.
+
+
+4. ARTE DO PERSONAGEM (TITAN)
+---------------------------------------------------------------------
+Foi recebida uma folha com 16 poses do personagem sobre fundo verde.
+O tratamento foi feito com um script em Python
+(tools/extract_sprites.py):
+
+  a) Remoção do fundo verde (chroma key) e limpeza da borda verde.
+  b) Separação das 16 poses, usando o corpo preto do shaker de cada
+     pose como referência para cortar, sem pegar pedaços do vizinho.
+  c) Alinhamento de todas as poses pelo centro do corpo e pelos pés,
+     para a animação não "pular" ao trocar de pose.
+  d) Exportação em PNG transparente: sprites/frames/frame_00.png até
+     frame_15.png. O arquivo sprites/player.png é a pose parada.
+
+No jogo, o personagem ficou com 90x90 px e ganhou:
+  - animação parado (2 poses) e andando (2 poses);
+  - pose de mostrar os músculos enquanto o combo x2 está ativo;
+  - espelhamento conforme a direção do movimento;
+  - hitbox reduzida (só corpo e copo apanham itens, os braços não),
+    para manter a dificuldade justa.
+
+
+5. ARTE DO WHEY PROTEIN
+---------------------------------------------------------------------
+Script: tools/extract_whey.py
+
+  a) O fundo cinza e a sombra foram removidos preenchendo a área a
+     partir das bordas da imagem (o pote preto bloqueia o preenchimento).
+  b) A borda foi suavizada e a imagem recortada rente ao pote.
+  c) Exportado como sprites/whey.png (transparente) e usado no jogo com
+     38x52 px, mantendo a proporção do pote.
+
+
+6. ARTE DO PESO DE OMBRO (HALTER)
+---------------------------------------------------------------------
+Script: tools/extract_shoulder.py
+
+  a) A imagem tinha um cenário completo (parede, chão e sombra). O
+     contorno preto do halter foi usado como barreira para separá-lo
+     do fundo.
+  b) Recorte rente ao halter e exportação em sprites/shoulder.png
+     (transparente), usado no jogo com 48x34 px.
+  c) Os ícones do combo no topo da tela foram ajustados para não
+     esticar imagens que não são quadradas.
+
+
+7. ESTRUTURA DE ARQUIVOS
+---------------------------------------------------------------------
+titan-catch.html            jogo completo
+sprites/
+    player.png              pose parada do personagem
+    frames/                 as 16 poses do personagem (frame_00..15)
+    whey.png                pote de whey
+    shoulder.png            halter (peso de ombro)
+    _preview_*.png          imagens de conferência dos recortes
+tools/
+    extract_sprites.py      recorta o personagem
+    extract_whey.py         recorta o whey
+    extract_shoulder.py     recorta o halter
+    (requer Python com as bibliotecas Pillow, numpy e scipy)
+
+
+8. SITUAÇÃO ATUAL DAS ARTES
+---------------------------------------------------------------------
+Com arte final:
+  [x] Personagem Titan (com animação)
+  [x] Whey protein
+  [x] Peso de ombro (halter)
+
+Ainda com placeholder (quadrado colorido com texto):
+  [ ] Barra de costas   -> sprites/back.png
+  [ ] Fast food         -> sprites/junk.png
+
+
+9. PEDIDO DE DESCULPAS
+---------------------------------------------------------------------
+Peço desculpas por não ter tido tempo de criar as demais artes, a
+barra de costas e o fast food. O jogo está completo e funcional, e
+essas duas imagens aparecem por enquanto como placeholders.
+
+Para finalizar, basta colocar as imagens nos caminhos indicados
+(sprites/back.png e sprites/junk.png). Não é preciso mexer no código:
+o jogo passa a usá-las automaticamente. Se precisar ajustar o tamanho
+de algum item, isso é feito no objeto SPRITES, no JavaScript.
+
+Obrigado pela compreensão.

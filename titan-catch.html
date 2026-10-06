@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Titan Catch - Advergame</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #2c3e50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: 'Arial', sans-serif;
+            color: white;
+            overflow: hidden;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 400px;
+            height: 600px;
+            background-color: #34495e;
+            border: 4px solid #f1c40f;
+            border-radius: 10px;
+            overflow: hidden;
+            transition: box-shadow 0.3s;
+        }
+
+        /* Brilho dourado enquanto o combo está ativo */
+        #gameContainer.combo-active {
+            box-shadow: 0 0 25px 4px #f1c40f inset;
+        }
+
+        /* ===== SPRITES =====
+           Os elementos agora são <img>. Troca os ficheiros em SPRITES (no JS)
+           pelas tuas imagens finais. Enquanto não existirem, é gerado um
+           placeholder automático (SVG) com a legenda de cada sprite. */
+        #shaker {
+            position: absolute;
+            bottom: 10px;
+            left: 155px;
+            width: 90px;
+            height: 90px;
+            display: block;
+            object-fit: contain;
+            object-position: bottom center;
+            user-select: none;
+            -webkit-user-drag: none;
+        }
+
+        #shaker.flip { transform: scaleX(-1); }
+
+        .item {
+            position: absolute;
+            width: 36px;   /* sobrescrito por item no JS (SPRITES[tipo].w/h) */
+            height: 36px;
+            object-fit: contain;
+            user-select: none;
+            -webkit-user-drag: none;
+            pointer-events: none;
+        }
+
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-weight: bold;
+            font-size: 18px;
+            z-index: 10;
+        }
+
+        /* ===== HUD DO COMBO ===== */
+        #comboHud {
+            position: absolute;
+            top: 40px;
+            left: 10px;
+            right: 10px;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        #comboSlots {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .slot {
+            width: 28px;
+            height: 28px;
+            border: 2px dashed #7f8c8d;
+            border-radius: 6px;
+            background: rgba(0,0,0,0.25);
+            opacity: 0.55;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.15s;
+        }
+
+        .slot img { width: 22px; height: 22px; object-fit: contain; }
+
+        .slot.done {
+            opacity: 1;
+            border: 2px solid #2ecc71;
+            background: rgba(46, 204, 113, 0.25);
+        }
+
+        #comboLabel { color: #bdc3c7; }
+
+        #comboBarWrap {
+            width: 180px;
+            height: 8px;
+            background: rgba(0,0,0,0.4);
+            border-radius: 4px;
+            overflow: hidden;
+            visibility: hidden;
+        }
+
+        #comboBar {
+            height: 100%;
+            width: 100%;
+            background: #f1c40f;
+        }
+
+        #comboHud.active #comboBarWrap { visibility: visible; }
+        #comboHud.active #comboLabel { color: #f1c40f; font-size: 14px; }
+
+        /* Textos flutuantes de pontos */
+        .popup {
+            position: absolute;
+            font-weight: bold;
+            font-size: 16px;
+            pointer-events: none;
+            z-index: 15;
+            animation: floatUp 0.8s ease-out forwards;
+            text-shadow: 0 1px 2px #000;
+        }
+
+        @keyframes floatUp {
+            from { transform: translateY(0); opacity: 1; }
+            to   { transform: translateY(-40px); opacity: 0; }
+        }
+
+        #gameOverScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 20;
+        }
+
+        .btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background-color: #f1c40f;
+            color: #2c3e50;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn:hover { background-color: #f39c12; }
+    </style>
+</head>
+<body>
+
+<div id="gameContainer">
+    <div id="ui">
+        <span>Pontos: <span id="score">0</span></span>
+        <span>Tempo: <span id="time">30</span>s</span>
+    </div>
+
+    <div id="comboHud">
+        <div id="comboSlots"></div>
+        <div id="comboLabel">Treino: 2x Ombro + 1x Costas = PONTOS x2</div>
+        <div id="comboBarWrap"><div id="comboBar"></div></div>
+    </div>
+
+    <img id="shaker" alt="Jogador">
+
+    <div id="gameOverScreen">
+        <h2>FIM DE TREINO!</h2>
+        <p>Pontuação Final: <span id="finalScore">0</span></p>
+        <p>Combos completos: <span id="finalCombos">0</span></p>
+        <p id="discountMsg"></p>
+        <button class="btn" onclick="location.reload()">Treinar Novamente</button>
+    </div>
+</div>
+
+<script>
+    const container = document.getElementById('gameContainer');
+    const shaker = document.getElementById('shaker');
+    const scoreDisplay = document.getElementById('score');
+    const timeDisplay = document.getElementById('time');
+    const gameOverScreen = document.getElementById('gameOverScreen');
+    const finalScoreDisplay = document.getElementById('finalScore');
+    const finalCombosDisplay = document.getElementById('finalCombos');
+    const discountMsg = document.getElementById('discountMsg');
+    const comboHud = document.getElementById('comboHud');
+    const comboSlotsEl = document.getElementById('comboSlots');
+    const comboLabel = document.getElementById('comboLabel');
+    const comboBar = document.getElementById('comboBar');
+
+    // ================== SPRITES (PLACEHOLDERS) ==================
+    // Substitui o caminho "src" pelos teus ficheiros reais (PNG/GIF/SVG).
+    // Se o ficheiro não existir, é usado automaticamente um placeholder SVG
+    // com a cor e a legenda abaixo.
+    const SPRITES = {
+        player:   { src: 'sprites/player.png',   label: 'PLAYER', color: '#ecf0f1', text: '#2c3e50', w: 90, h: 90 },
+        shoulder: { src: 'sprites/shoulder.png', label: 'OMBRO',  color: '#3498db', text: '#fff',    w: 48, h: 34 },
+        back:     { src: 'sprites/back.png',     label: 'COSTAS', color: '#9b59b6', text: '#fff',    w: 36, h: 36 },
+        whey:     { src: 'sprites/whey.png',     label: 'WHEY',   color: '#2ecc71', text: '#fff',    w: 38, h: 52 },
+        junk:     { src: 'sprites/junk.png',     label: 'LIXO',   color: '#e74c3c', text: '#fff',    w: 36, h: 36 }
+    };
+
+    function placeholderSVG(s) {
+        const fontSize = Math.max(7, Math.floor(s.w / 4.5));
+        const svg =
+            `<svg xmlns="http://www.w3.org/2000/svg" width="${s.w}" height="${s.h}" viewBox="0 0 ${s.w} ${s.h}">` +
+            `<rect x="1" y="1" width="${s.w - 2}" height="${s.h - 2}" rx="6" fill="${s.color}" stroke="#000" stroke-opacity=".4" stroke-width="2"/>` +
+            `<text x="50%" y="50%" fill="${s.text}" font-family="Arial" font-weight="bold" font-size="${fontSize}" ` +
+            `text-anchor="middle" dominant-baseline="middle">${s.label}</text></svg>`;
+        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    }
+
+    // Aplica um sprite a um <img>, com fallback para o placeholder
+    function applySprite(img, key) {
+        const s = SPRITES[key];
+        img.onerror = () => { img.onerror = null; img.src = placeholderSVG(s); };
+        img.src = s.src;
+    }
+
+    applySprite(shaker, 'player');
+
+    // ================== TIPOS DE ITEM ==================
+    // weight = chance relativa de aparecer | points = pontos base | speed = velocidade de queda
+    const ITEM_TYPES = {
+        shoulder: { points: 10, speed: 3, weight: 28 },
+        back:     { points: 10, speed: 3, weight: 22 },
+        whey:     { points: 10, speed: 3, weight: 20 },  // neutro para o combo
+        junk:     { points: -15, speed: 5, weight: 30 }  // quebra o combo
+    };
+
+    function pickItemType() {
+        const total = Object.values(ITEM_TYPES).reduce((sum, t) => sum + t.weight, 0);
+        let r = Math.random() * total;
+        for (const [key, t] of Object.entries(ITEM_TYPES)) {
+            if ((r -= t.weight) < 0) return key;
+        }
+        return 'whey';
+    }
+
+    // ================== SISTEMA DE COMBO ==================
+    const COMBO_SEQUENCE = ['shoulder', 'shoulder', 'back']; // 2 ombros + 1 costas
+    const COMBO_MULTIPLIER = 2;
+    const COMBO_DURATION = 8000; // ms
+
+    let comboProgress = 0;     // quantos passos da sequência já foram feitos
+    let comboEndsAt = 0;       // timestamp de fim do multiplicador
+    let combosCompleted = 0;
+
+    function isComboActive() {
+        return Date.now() < comboEndsAt;
+    }
+
+    // Cria os slots do HUD
+    const slotEls = COMBO_SEQUENCE.map((type) => {
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        const img = document.createElement('img');
+        applySprite(img, type);
+        slot.appendChild(img);
+        comboSlotsEl.appendChild(slot);
+        return slot;
+    });
+
+    function renderComboSlots() {
+        slotEls.forEach((slot, i) => slot.classList.toggle('done', i < comboProgress));
+    }
+
+    // Atualiza o progresso da sequência a cada item apanhado.
+    // Retorna true se o combo acabou de ser completado.
+    function updateComboProgress(type) {
+        if (type === 'junk') {
+            comboProgress = 0;                       // fast food quebra a sequência
+        } else if (type === 'whey') {
+            // suplemento: não ajuda nem atrapalha a sequência
+        } else if (type === COMBO_SEQUENCE[comboProgress]) {
+            comboProgress++;                         // passo certo
+        } else if (type === COMBO_SEQUENCE[0]) {
+            comboProgress = 1;                       // passo errado, mas recomeça
+        } else {
+            comboProgress = 0;
+        }
+
+        if (comboProgress >= COMBO_SEQUENCE.length) {
+            comboProgress = 0;
+            comboEndsAt = Date.now() + COMBO_DURATION; // (re)inicia o x2
+            combosCompleted++;
+            renderComboSlots();
+            return true;
+        }
+        renderComboSlots();
+        return false;
+    }
+
+    // Atualiza barra/HUD do combo (chamado a cada 100ms)
+    function updateComboHud() {
+        const active = isComboActive();
+        comboHud.classList.toggle('active', active);
+        container.classList.toggle('combo-active', active);
+
+        if (active) {
+            const remaining = comboEndsAt - Date.now();
+            comboBar.style.width = (remaining / COMBO_DURATION * 100) + '%';
+            comboLabel.textContent = `COMBO x${COMBO_MULTIPLIER}! ${(remaining / 1000).toFixed(1)}s`;
+        } else {
+            comboLabel.textContent = 'Treino: 2x Ombro + 1x Costas = PONTOS x2';
+        }
+    }
+
+    function showPopup(text, color, x, y) {
+        const p = document.createElement('div');
+        p.className = 'popup';
+        p.textContent = text;
+        p.style.color = color;
+        p.style.left = x + 'px';
+        p.style.top = y + 'px';
+        container.appendChild(p);
+        setTimeout(() => p.remove(), 800);
+    }
+
+    // ================== JOGO ==================
+    let score = 0;
+    let timeLeft = 30;
+    let gameInterval;
+    let itemSpawner;
+    let hudInterval;
+    let isGameOver = false;
+
+    // Movimentação do jogador
+    const containerWidth = 400;
+    const shakerWidth = 90;               // largura do sprite do personagem
+    let shakerX = (containerWidth - shakerWidth) / 2;
+    const shakerSpeed = 25;
+    const itemSize = 36;
+    shaker.style.left = shakerX + 'px';
+
+    // Hitbox: só o corpo/copo do personagem apanha itens (braços não contam)
+    function getPlayerHitbox() {
+        const r = shaker.getBoundingClientRect();
+        const insetX = r.width * 0.22;
+        return {
+            left: r.left + insetX,
+            right: r.right - insetX,
+            top: r.top + r.height * 0.08,
+            bottom: r.bottom - r.height * 0.10
+        };
+    }
+
+    // ===== Animação do personagem =====
+    // idle = respirando | walk = a andar | combo = pose a mostrar os músculos
+    const PLAYER_ANIMS = {
+        idle:  ['sprites/frames/frame_07.png', 'sprites/frames/frame_08.png'],
+        walk:  ['sprites/frames/frame_05.png', 'sprites/frames/frame_06.png'],
+        combo: ['sprites/frames/frame_00.png', 'sprites/frames/frame_01.png',
+                'sprites/frames/frame_02.png', 'sprites/frames/frame_03.png']
+    };
+    // pré-carrega para não piscar na troca de frames
+    Object.values(PLAYER_ANIMS).flat().forEach((src) => { new Image().src = src; });
+
+    let lastMoveAt = 0;
+    let animTick = 0;
+    function updatePlayerAnim() {
+        let state = 'idle';
+        if (isComboActive()) state = 'combo';
+        else if (Date.now() - lastMoveAt < 250) state = 'walk';
+        const frames = PLAYER_ANIMS[state];
+        const src = frames[animTick % frames.length];
+        if (!shaker.src.endsWith(src)) shaker.src = src;
+        animTick++;
+    }
+    const playerAnimInterval = setInterval(updatePlayerAnim, 180);
+
+    document.addEventListener('keydown', (e) => {
+        if (isGameOver) return;
+        if (e.key === 'ArrowLeft') {
+            shakerX = Math.max(0, shakerX - shakerSpeed);
+            shaker.classList.add('flip');
+            lastMoveAt = Date.now();
+        } else if (e.key === 'ArrowRight') {
+            shakerX = Math.min(containerWidth - shakerWidth, shakerX + shakerSpeed);
+            shaker.classList.remove('flip');
+            lastMoveAt = Date.now();
+        }
+        shaker.style.left = shakerX + 'px';
+    });
+
+    // Processa a apanha de um item
+    function onCatch(type, itemX, itemY) {
+        const def = ITEM_TYPES[type];
+        const comboJustCompleted = updateComboProgress(type);
+
+        let gained = def.points;
+        if (gained > 0 && isComboActive()) gained *= COMBO_MULTIPLIER; // só ganhos duplicam
+
+        score = Math.max(0, score + gained);
+        scoreDisplay.innerText = score;
+
+        if (comboJustCompleted) {
+            showPopup('COMBO! x2', '#f1c40f', 150, 260);
+        }
+        showPopup((gained > 0 ? '+' : '') + gained, gained > 0 ? '#2ecc71' : '#e74c3c', itemX, itemY - 20);
+        updateComboHud();
+    }
+
+    // Spawn de Itens
+    function spawnItem() {
+        if (isGameOver) return;
+
+        const type = pickItemType();
+        const def = ITEM_TYPES[type];
+
+        const item = document.createElement('img');
+        item.classList.add('item');
+        item.alt = type;
+        applySprite(item, type);
+
+        // Tamanho próprio de cada sprite (ex.: o pote de whey é mais alto)
+        const itemW = SPRITES[type].w;
+        const itemH = SPRITES[type].h;
+        item.style.width = itemW + 'px';
+        item.style.height = itemH + 'px';
+
+        // Posição inicial aleatória no topo
+        const itemX = Math.random() * (containerWidth - itemW);
+        item.style.left = itemX + 'px';
+        item.style.top = -itemH + 'px';
+
+        container.appendChild(item);
+
+        // Animação de queda
+        let itemY = -itemH;
+
+        const fallInterval = setInterval(() => {
+            if (isGameOver) {
+                item.remove();
+                clearInterval(fallInterval);
+                return;
+            }
+
+            itemY += def.speed;
+            item.style.top = itemY + 'px';
+
+            // Verificação de Colisão
+            const itemRect = item.getBoundingClientRect();
+            const shakerRect = getPlayerHitbox();
+
+            if (
+                itemRect.bottom >= shakerRect.top &&
+                itemRect.top <= shakerRect.bottom &&
+                itemRect.right >= shakerRect.left &&
+                itemRect.left <= shakerRect.right
+            ) {
+                onCatch(type, itemX, itemY);
+                item.remove();
+                clearInterval(fallInterval);
+            } else if (itemY > 600) {
+                // Caiu fora da tela
+                item.remove();
+                clearInterval(fallInterval);
+            }
+        }, 20);
+    }
+
+    // Lógica de Tempo e Game Over
+    function startGame() {
+        renderComboSlots();
+        gameInterval = setInterval(() => {
+            timeLeft--;
+            timeDisplay.innerText = timeLeft;
+
+            if (timeLeft <= 0) {
+                endGame();
+            }
+        }, 1000);
+
+        itemSpawner = setInterval(spawnItem, 800);
+        hudInterval = setInterval(updateComboHud, 100);
+    }
+
+    function endGame() {
+        isGameOver = true;
+        clearInterval(gameInterval);
+        clearInterval(itemSpawner);
+        clearInterval(hudInterval);
+        comboEndsAt = 0;
+        updateComboHud();
+
+        finalScoreDisplay.innerText = score;
+        finalCombosDisplay.innerText = combosCompleted;
+
+        // Lógica do Advergame: Gerar Cupom baseado na pontuação
+        if (score >= 300) {
+            discountMsg.innerHTML = "Mostro! Ganhaste 20% OFF!<br><strong>CUPOM: TITAN20</strong>";
+        } else if (score >= 150) {
+            discountMsg.innerHTML = "Bom treino! Ganhaste 10% OFF!<br><strong>CUPOM: TITAN10</strong>";
+        } else {
+            discountMsg.innerHTML = "Precisas de treinar mais.<br>Sem desconto desta vez.";
+        }
+
+        gameOverScreen.style.display = 'flex';
+    }
+
+    // Iniciar o jogo
+    startGame();
+</script>
+</body>
+</html>
